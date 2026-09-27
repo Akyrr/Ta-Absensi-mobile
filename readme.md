@@ -1,5 +1,3 @@
-# Git Workflow
-
 ## 1. Struktur Branch
 
 - `main` — kode stabil, hanya diisi dari `dev` yang sudah teruji. Jangan pernah push langsung ke sini.
