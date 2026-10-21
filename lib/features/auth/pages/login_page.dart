@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/constants/app_color.dart';
+import '../../../services/auth_service.dart';
 import '../../home/home.dart';
 import 'registration_page.dart';
 
@@ -18,6 +19,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -27,9 +29,88 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate() || _isLoading) {
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+      final body = await AuthService.login(email, password);
+
+      if (!mounted) return;
+
+      final code = body['code'];
+      if (code == 'AUTH_LOGIN_SUCCESS') {
+        String activeRole = 'Dashboard Gabungan';
+        final data = body['data'];
+        if (data is Map<String, dynamic>) {
+          final user = data['user'];
+          if (user is Map<String, dynamic>) {
+            final roles = user['roles'];
+            if (roles is List && roles.isNotEmpty) {
+              final firstRole = roles.first;
+              if (firstRole is String && firstRole.isNotEmpty) {
+                activeRole = firstRole;
+              } else if (firstRole is Map && firstRole['name'] != null) {
+                activeRole = firstRole['name'].toString();
+              }
+            }
+          }
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(activeRole: activeRole),
+          ),
+        );
+      } else {
+        String message;
+        switch (code) {
+          case 'AUTH_INVALID_CREDENTIALS':
+            message = 'Surel atau kata sandi tidak valid.';
+            break;
+          case 'AUTH_ACCOUNT_LOCKED':
+            message = 'Akun terkunci. Silakan hubungi admin.';
+            break;
+          case 'AUTH_ACCOUNT_INACTIVE':
+            message = 'Akun tidak aktif. Silakan hubungi admin.';
+            break;
+          case 'RATE_LIMITED':
+            message = 'Terlalu banyak percobaan. Silakan coba lagi nanti.';
+            break;
+          case 'VALIDATION_ERROR':
+            message = 'Data yang dimasukkan tidak valid.';
+            break;
+          default:
+            message = (body['message'] as String?)?.isNotEmpty == true
+                ? body['message'] as String
+                : 'Terjadi kesalahan saat masuk.';
+            break;
+        }
+        _showMessage(message);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Gagal terhubung ke server. Periksa koneksi jaringan Anda.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -217,34 +298,34 @@ class _LoginPageState extends State<LoginPage> {
               width: double.infinity,
               height: s(42),
               child: ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            const HomePage(activeRole: 'Dashboard Gabungan'),
-                      ),
-                    );
-                  }
-                },
-
+                onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.brandPrimary,
                   foregroundColor: AppColors.textWhite,
+                  disabledBackgroundColor: AppColors.brandPrimary,
+                  disabledForegroundColor: AppColors.textWhite,
                   elevation: 0,
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(s(8)),
                   ),
                 ),
-                child: Text(
-                  'Masuk',
-                  style: TextStyle(
-                    fontSize: s(12),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: _isLoading
+                    ? SizedBox(
+                        width: s(20),
+                        height: s(20),
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.textWhite,
+                        ),
+                      )
+                    : Text(
+                        'Masuk',
+                        style: TextStyle(
+                          fontSize: s(12),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ),
 
