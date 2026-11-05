@@ -1,6 +1,8 @@
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../../../core/constants/app_color.dart';
+import '../../../services/auth_service.dart';
 
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
@@ -22,6 +24,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _isSuccess = false;
+  String? _errorMessage;
 
   String get _password => _passwordController.text;
 
@@ -59,24 +62,75 @@ class _RegistrationPageState extends State<RegistrationPage> {
     super.dispose();
   }
 
+  /// Ubah kode error backend menjadi pesan untuk pengguna.
+  String _messageFromBody(Map<String, dynamic> body) {
+    final code = body['code'];
+    switch (code) {
+      case 'CONFLICT':
+        return 'Surel atau NISN sudah terdaftar. Gunakan data lain atau masuk ke akun Anda.';
+      case 'VALIDATION_ERROR':
+        final errors = body['errors'];
+        if (errors is List && errors.isNotEmpty) {
+          return errors.map((e) => e.toString()).join('\n');
+        }
+        return 'Data yang dimasukkan tidak valid.';
+      case 'RATE_LIMITED':
+        return 'Terlalu banyak percobaan. Silakan coba lagi nanti.';
+      default:
+        final message = body['message'];
+        return (message is String && message.isNotEmpty)
+            ? message
+            : 'Terjadi kesalahan saat mendaftar.';
+    }
+  }
+
   Future<void> _register() async {
     FocusScope.of(context).unfocus();
 
-    setState(() => _isSuccess = false);
+    setState(() {
+      _isSuccess = false;
+      _errorMessage = null;
+    });
 
     if (!_formKey.currentState!.validate()) return;
+    if (_isLoading) return;
 
     setState(() => _isLoading = true);
 
-    // Simulasi sementara, belum terhubung ke backend.
-    await Future<void>.delayed(const Duration(milliseconds: 800));
+    try {
+      final body = await AuthService.register(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        nisn: _nisnController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-      _isSuccess = true;
-    });
+      if (body['code'] == 'AUTH_REGISTER_SUCCESS') {
+        setState(() {
+          _isLoading = false;
+          _isSuccess = true;
+        });
+
+        // Registrasi tidak mengembalikan token, jadi arahkan ke halaman masuk.
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = _messageFromBody(body);
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Gagal terhubung ke server. Periksa koneksi jaringan Anda.';
+      });
+    }
   }
 
   @override
@@ -128,81 +182,79 @@ class _RegistrationPageState extends State<RegistrationPage> {
     );
   }
 
-  
-Widget _buildHeader() {
-  return Column(
-    children: [
-      SizedBox(
-        height: 44,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Tombol Back tetap di posisi semula.
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Material(
-                color: AppColors.backgroundWhite,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 44,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Tombol Back tetap di posisi semula.
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Material(
+                  color: AppColors.backgroundWhite,
                   borderRadius: BorderRadius.circular(10),
-                  onTap: () => Navigator.of(context).maybePop(),
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Icon(
-                      Icons.arrow_back_rounded,
-                      size: 21,
-                      color: AppColors.textSecondary,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => Navigator.of(context).maybePop(),
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Icon(
+                        Icons.arrow_back_rounded,
+                        size: 21,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Ikon digeser sedikit ke bawah.
-            Transform.translate(
-              offset: const Offset(0, 68),
-              child: Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.brandPrimary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.menu_book_rounded,
-                  color: AppColors.textWhite,
-                  size: 27,
+              // Ikon digeser sedikit ke bawah.
+              Transform.translate(
+                offset: const Offset(0, 68),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.brandPrimary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.menu_book_rounded,
+                    color: AppColors.textWhite,
+                    size: 27,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 84),
-      Text(
-        'Daftar sebagai Siswa',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 25,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+        const SizedBox(height: 84),
+        Text(
+          'Daftar sebagai Siswa',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 25,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
         ),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        'Lengkapi data diri untuk memulai presensi\n'
-        'dan jurnal sekolah.',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 12,
-          height: 1.5,
-          color: AppColors.textSecondary,
+        const SizedBox(height: 8),
+        Text(
+          'Lengkapi data diri untuk memulai presensi\n'
+          'dan jurnal sekolah.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.5,
+            color: AppColors.textSecondary,
+          ),
         ),
-      ),
-    ],
-  );
-}
-
+      ],
+    );
+  }
 
   Widget _buildRegistrationCard() {
     return Container(
@@ -222,6 +274,10 @@ Widget _buildHeader() {
               _buildSuccessBanner(),
               const SizedBox(height: 16),
             ],
+            if (_errorMessage != null) ...[
+              _buildErrorBanner(_errorMessage!),
+              const SizedBox(height: 16),
+            ],
 
             _buildLabel('Nama Lengkap'),
             const SizedBox(height: 8),
@@ -234,8 +290,15 @@ Widget _buildHeader() {
                 hint: 'Masukkan nama lengkap',
               ),
               validator: (value) {
-                if (value == null || value.trim().isEmpty) {
+                final v = value?.trim() ?? '';
+                if (v.isEmpty) {
                   return 'Nama lengkap wajib diisi';
+                }
+                if (v.length < 2) {
+                  return 'Nama minimal 2 karakter';
+                }
+                if (v.length > 150) {
+                  return 'Nama maksimal 150 karakter';
                 }
                 return null;
               },
@@ -256,6 +319,9 @@ Widget _buildHeader() {
                 if (value == null || value.trim().isEmpty) {
                   return 'Surel wajib diisi';
                 }
+                if (value.trim().length > 255) {
+                  return 'Surel maksimal 255 karakter';
+                }
                 if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
                     .hasMatch(value.trim())) {
                   return 'Format surel tidak valid';
@@ -272,6 +338,7 @@ Widget _buildHeader() {
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.next,
               maxLength: 10,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               style: _fieldTextStyle(),
               decoration: _inputDecoration(
                 hint: 'Masukkan 10 digit NISN',
@@ -323,6 +390,9 @@ Widget _buildHeader() {
                 }
                 if (value.length < 8) {
                   return 'Kata sandi minimal 8 karakter';
+                }
+                if (value.length > 72) {
+                  return 'Kata sandi maksimal 72 karakter';
                 }
                 return null;
               },
@@ -388,11 +458,12 @@ Widget _buildHeader() {
               width: double.infinity,
               height: 46,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _register,
+                onPressed: (_isLoading || _isSuccess) ? null : _register,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.brandPrimary,
                   foregroundColor: AppColors.textWhite,
                   disabledBackgroundColor: AppColors.brandTertiary,
+                  disabledForegroundColor: AppColors.textWhite,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -591,13 +662,45 @@ Widget _buildHeader() {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Akun siswa siap digunakan.',
+                  'Akun siswa siap digunakan. Mengarahkan ke halaman masuk...',
                   style: TextStyle(
                     fontSize: 11,
                     color: AppColors.statusSuccess,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.statusBackgroundError,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.error_outline,
+            color: AppColors.statusError,
+            size: 19,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: AppColors.statusError,
+              ),
             ),
           ),
         ],

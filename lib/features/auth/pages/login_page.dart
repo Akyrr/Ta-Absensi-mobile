@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/constants/app_color.dart';
+import '../widgets/auth_widgets.dart';
 import '../../../services/auth_service.dart';
 import '../../home/home.dart';
 import 'registration_page.dart';
@@ -272,9 +273,7 @@ class _LoginPageState extends State<LoginPage> {
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () {
-                  _showMessage(
-                    'Halaman lupa kata sandi akan dibuat berikutnya.',
-                  );
+                  Navigator.pushNamed(context, '/forgot-password');
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
