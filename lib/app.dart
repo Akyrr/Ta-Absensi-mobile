@@ -7,6 +7,11 @@ import 'features/home/home.dart';
 import 'features/absensi/pages/absensi_page.dart';
 import 'features/jurnal/pages/jurnal_page.dart';
 import 'features/jadwal/pages/jadwal_page.dart';
+import 'core/widgets/access_denied_page.dart';
+import 'features/auth/pages/web_only_page.dart';
+import 'features/mata_pelajaran/pages/mata_pelajaran_page.dart';
+import 'features/data_siswa/pages/siswa_kelas_page.dart';
+import 'features/kelas/pages/kelas_page.dart';
 
 class AbsensiJurnalApp extends StatelessWidget {
   const AbsensiJurnalApp({super.key});
@@ -38,6 +43,11 @@ class AbsensiJurnalApp extends StatelessWidget {
         '/absensi': (context) => const AbsensiPage(),
         '/jurnal': (context) => const JurnalPage(),
         '/jadwal': (context) => const JadwalPage(),
+        '/access-denied': (context) => const AccessDeniedPage(),
+        '/web-only': (context) => const WebOnlyPage(),
+        '/mata-pelajaran': (context) => const MataPelajaranPage(),
+        '/siswa-kelas': (context) => const SiswaKelasPage(),
+        '/kelas': (context) => const KelasPage(),
       },
     );
   }
